@@ -5,7 +5,7 @@ WORKDIR /app
 # Copy the wrapper files and pom.xml first to leverage Docker caching
 COPY .mvn/ .mvn
 COPY mvnw pom.xml ./
-RUN ./mvnw dependency:go-offline
+RUN chmod +x mvnw && ./mvnw dependency:go-offline
 
 # Copy the source code and compile the heavy JAR file
 COPY src ./src
