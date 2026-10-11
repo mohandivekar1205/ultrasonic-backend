@@ -8,9 +8,14 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface MessageRepository extends JpaRepository<Message, UUID> {
+
+    Optional<Message> findFirstByConversationIdOrderByCreatedAtDesc(UUID conversationId);
+
+    Optional<Message> findFirstByGroupIdOrderByCreatedAtDesc(UUID groupId);
 
     @Query("SELECT m FROM Message m LEFT JOIN FETCH m.sender WHERE m.conversationId = :conversationId AND m.createdAt < :timestamp ORDER BY m.createdAt DESC")
     List<Message> findByConversationIdAndCreatedAtBefore(
