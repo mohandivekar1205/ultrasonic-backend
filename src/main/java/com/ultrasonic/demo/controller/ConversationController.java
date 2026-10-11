@@ -1,9 +1,10 @@
 package com.ultrasonic.demo.controller;
 
+import com.ultrasonic.demo.dto.ConversationSummaryDto;
 import com.ultrasonic.demo.dto.CreateConversationRequest;
 import com.ultrasonic.demo.dto.CreateMessageRequest;
+import com.ultrasonic.demo.dto.MessageResponseDto;
 import com.ultrasonic.demo.entity.Conversation;
-import com.ultrasonic.demo.entity.Message;
 import com.ultrasonic.demo.service.ChatService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -27,18 +28,18 @@ public class ConversationController {
     }
 
     @GetMapping
-    public ResponseEntity<List<com.ultrasonic.demo.dto.ConversationSummaryDto>> getConversations() {
+    public ResponseEntity<List<ConversationSummaryDto>> getConversations() {
         return ResponseEntity.ok(chatService.getConversationsForCurrentUser());
     }
 
     @GetMapping("/{id}/messages")
-    public ResponseEntity<List<Message>> getMessages(
+    public ResponseEntity<List<MessageResponseDto>> getMessages(
             @PathVariable UUID id,
             @RequestParam(required = false) Long before,
             @RequestParam(required = false) Long after,
             @RequestParam(defaultValue = "50") int limit) {
         
-        List<Message> messages;
+        List<MessageResponseDto> messages;
         if (after != null) {
             messages = chatService.getMessagesAfter(id, after);
         } else {
@@ -51,8 +52,8 @@ public class ConversationController {
     }
 
     @PostMapping("/{id}/messages")
-    public ResponseEntity<Message> createMessage(@PathVariable UUID id, @RequestBody CreateMessageRequest request) {
-        Message message = chatService.createMessage(id, request);
+    public ResponseEntity<MessageResponseDto> createMessage(@PathVariable UUID id, @RequestBody CreateMessageRequest request) {
+        MessageResponseDto message = chatService.createMessage(id, request);
         return ResponseEntity.ok(message);
     }
 }

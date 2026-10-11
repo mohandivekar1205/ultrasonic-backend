@@ -1,21 +1,31 @@
 package com.ultrasonic.demo.service;
 
+import com.ultrasonic.demo.dto.ConversationSummaryDto;
 import com.ultrasonic.demo.dto.CreateConversationRequest;
 import com.ultrasonic.demo.dto.CreateMessageRequest;
+import com.ultrasonic.demo.dto.MessageResponseDto;
 import com.ultrasonic.demo.entity.Conversation;
+import com.ultrasonic.demo.entity.Group;
+import com.ultrasonic.demo.entity.GroupMember;
 import com.ultrasonic.demo.entity.Message;
 import com.ultrasonic.demo.entity.User;
 import com.ultrasonic.demo.repository.ConversationRepository;
+import com.ultrasonic.demo.repository.GroupMemberRepository;
+import com.ultrasonic.demo.repository.GroupRepository;
 import com.ultrasonic.demo.repository.MessageRepository;
 import com.ultrasonic.demo.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -32,62 +42,72 @@ public class ChatService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private GroupRepository groupRepository;
+
+    @Autowired
+    private GroupMemberRepository groupMemberRepository;
+
     private User getCurrentUser() {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        return userRepository.findByUsername(username).orElseThrow();
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found"));
     }
 
+    @Transactional
     public Conversation getOrCreateConversation(CreateConversationRequest request) {
         User currentUser = getCurrentUser();
         UUID userId1 = currentUser.getId();
         UUID userId2 = request.getTargetUserId();
 
-        Optional<Conversation> existing = conversationRepository.findByUsers(userId1, userId2);
+        if (userId1.equals(userId2)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot create a conversation with yourself");
+        }
+
+        // Enforce chk_conv_order (user_a_id < user_b_id) strictly by lexical UUID order
+        UUID userAId = userId1.toString().compareTo(userId2.toString()) < 0 ? userId1 : userId2;
+        UUID userBId = userId1.toString().compareTo(userId2.toString()) < 0 ? userId2 : userId1;
+
+        Optional<Conversation> existing = conversationRepository.findByUserAIdAndUserBId(userAId, userBId);
         if (existing.isPresent()) {
             return existing.get();
         }
 
         Conversation newConv = new Conversation();
-        newConv.setUserAId(userId1);
-        newConv.setUserBId(userId2);
+        newConv.setUserAId(userAId);
+        newConv.setUserBId(userBId);
         return conversationRepository.save(newConv);
     }
 
-    @Autowired
-    private com.ultrasonic.demo.repository.GroupRepository groupRepository;
-
-    @Autowired
-    private com.ultrasonic.demo.repository.GroupMemberRepository groupMemberRepository;
-
-    public List<com.ultrasonic.demo.dto.ConversationSummaryDto> getConversationsForCurrentUser() {
+    public List<ConversationSummaryDto> getConversationsForCurrentUser() {
         User currentUser = getCurrentUser();
         List<Conversation> convs = conversationRepository.findByUserAIdOrUserBId(currentUser.getId(), currentUser.getId());
-        
-        java.util.List<com.ultrasonic.demo.dto.ConversationSummaryDto> allSummaries = new java.util.ArrayList<>();
+        List<ConversationSummaryDto> allSummaries = new ArrayList<>();
 
-        // Add 1:1 Conversations
+        // 1:1 Direct Conversations
         for (Conversation c : convs) {
-            com.ultrasonic.demo.dto.ConversationSummaryDto dto = new com.ultrasonic.demo.dto.ConversationSummaryDto();
+            ConversationSummaryDto dto = new ConversationSummaryDto();
             dto.setId(c.getId());
             dto.setGroup(false);
+
             UUID otherUserId = c.getUserAId().equals(currentUser.getId()) ? c.getUserBId() : c.getUserAId();
             User otherUser = userRepository.findById(otherUserId).orElse(null);
-            
+
             if (otherUser != null) {
                 dto.setOtherUsername(otherUser.getUsername());
                 dto.setOtherDisplayName(otherUser.getDisplayName());
-                
-                String nameToUse = (otherUser.getDisplayName() != null && !otherUser.getDisplayName().isEmpty()) 
-                    ? otherUser.getDisplayName() 
-                    : otherUser.getUsername();
+                String nameToUse = (otherUser.getDisplayName() != null && !otherUser.getDisplayName().isEmpty())
+                        ? otherUser.getDisplayName()
+                        : otherUser.getUsername();
                 dto.setAvatarLetter(nameToUse.substring(0, 1).toUpperCase());
             } else {
                 dto.setOtherUsername("Unknown");
                 dto.setOtherDisplayName("Unknown");
                 dto.setAvatarLetter("U");
             }
-            
-            List<Message> msgs = messageRepository.findByConversationIdAndCreatedAtBefore(c.getId(), LocalDateTime.now().plusDays(1), PageRequest.of(0, 1));
+
+            List<Message> msgs = messageRepository.findByConversationIdAndCreatedAtBefore(
+                    c.getId(), LocalDateTime.now().plusDays(1), PageRequest.of(0, 1));
             if (!msgs.isEmpty()) {
                 Message last = msgs.get(0);
                 dto.setLastMessage(last.getContent());
@@ -99,27 +119,30 @@ public class ChatService {
             allSummaries.add(dto);
         }
 
-        // Add Groups
-        List<com.ultrasonic.demo.entity.GroupMember> groupMembers = groupMemberRepository.findByUserId(currentUser.getId());
-        for (com.ultrasonic.demo.entity.GroupMember gm : groupMembers) {
-            com.ultrasonic.demo.entity.Group g = groupRepository.findById(gm.getGroupId()).orElse(null);
+        // Group Conversations
+        List<GroupMember> groupMembers = groupMemberRepository.findByUserId(currentUser.getId());
+        for (GroupMember gm : groupMembers) {
+            Group g = groupRepository.findById(gm.getGroupId()).orElse(null);
             if (g != null) {
-                com.ultrasonic.demo.dto.ConversationSummaryDto dto = new com.ultrasonic.demo.dto.ConversationSummaryDto();
+                ConversationSummaryDto dto = new ConversationSummaryDto();
                 dto.setId(g.getId());
                 dto.setGroup(true);
                 dto.setOtherUsername(g.getName());
                 dto.setOtherDisplayName(g.getName());
                 dto.setAvatarLetter(g.getName().substring(0, 1).toUpperCase());
 
-                List<Message> msgs = messageRepository.findByGroupIdAndCreatedAtBefore(g.getId(), LocalDateTime.now().plusDays(1), PageRequest.of(0, 1));
+                List<Message> msgs = messageRepository.findByGroupIdAndCreatedAtBefore(
+                        g.getId(), LocalDateTime.now().plusDays(1), PageRequest.of(0, 1));
                 if (!msgs.isEmpty()) {
                     Message last = msgs.get(0);
                     dto.setLastMessage(last.getContent());
                     dto.setLastMessageTime(last.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
                 } else {
                     dto.setLastMessage("Group created");
-                    // Use a recent fallback time if Group doesn't have a createdAt
-                    dto.setLastMessageTime(System.currentTimeMillis());
+                    long createdTime = g.getCreatedAt() != null 
+                            ? g.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() 
+                            : System.currentTimeMillis();
+                    dto.setLastMessageTime(createdTime);
                 }
                 allSummaries.add(dto);
             }
@@ -129,44 +152,81 @@ public class ChatService {
         return allSummaries;
     }
 
-    public Message createMessage(UUID conversationId, CreateMessageRequest request) {
+    @Transactional
+    public MessageResponseDto createMessage(UUID conversationId, CreateMessageRequest request) {
+        User sender = getCurrentUser();
         Message message = new Message();
         if (request.getId() != null) {
             message.setId(request.getId());
         } else {
             message.setId(UUID.randomUUID());
         }
+
+        // Enforce chk_msg_target: 1:1 conversation has conversation_id, group_id is null
         message.setConversationId(conversationId);
-        message.setSenderId(getCurrentUser().getId());
+        message.setGroupId(null);
+        message.setSenderId(sender.getId());
         message.setContent(request.getContent());
+
         if (request.getType() != null) {
             message.setType(request.getType());
         }
         if (request.getTimestamp() != null) {
             message.setCreatedAt(LocalDateTime.ofInstant(Instant.ofEpochMilli(request.getTimestamp()), ZoneId.systemDefault()));
         }
-        
+
         message.setMediaFileName(request.getMediaFileName());
         message.setMediaMimeType(request.getMediaMimeType());
         message.setMediaSizeBytes(request.getMediaSizeBytes());
         message.setMediaChecksum(request.getMediaChecksum());
-        
-        return messageRepository.save(message);
+
+        Message saved = messageRepository.save(message);
+        saved.setSender(sender);
+        return mapToResponseDto(saved);
     }
 
-    public List<Message> getMessagesBefore(UUID conversationId, Long timestamp, int limit) {
+    public List<MessageResponseDto> getMessagesBefore(UUID conversationId, Long timestamp, int limit) {
         LocalDateTime time = LocalDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneId.systemDefault());
-        return messageRepository.findByConversationIdAndCreatedAtBefore(conversationId, time, PageRequest.of(0, limit));
+        List<Message> msgs = messageRepository.findByConversationIdAndCreatedAtBefore(conversationId, time, PageRequest.of(0, limit));
+        return msgs.stream().map(this::mapToResponseDto).toList();
     }
 
-    public List<Message> getMessagesAfter(UUID conversationId, Long timestamp) {
+    public List<MessageResponseDto> getMessagesAfter(UUID conversationId, Long timestamp) {
         LocalDateTime time = LocalDateTime.ofInstant(Instant.ofEpochMilli(timestamp), ZoneId.systemDefault());
-        return messageRepository.findByConversationIdAndCreatedAtAfter(conversationId, time);
+        List<Message> msgs = messageRepository.findByConversationIdAndCreatedAtAfter(conversationId, time);
+        return msgs.stream().map(this::mapToResponseDto).toList();
     }
 
+    @Transactional
     public void updateMessageStatus(UUID messageId, String status) {
-        Message message = messageRepository.findById(messageId).orElseThrow();
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found"));
         message.setDeliveryStatus(status);
         messageRepository.save(message);
+    }
+
+    public MessageResponseDto mapToResponseDto(Message m) {
+        String senderUsername = m.getSender() != null ? m.getSender().getUsername() : null;
+        String senderDisplayName = m.getSender() != null ? m.getSender().getDisplayName() : null;
+        long createdAtMs = m.getCreatedAt() != null
+                ? m.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                : System.currentTimeMillis();
+
+        return MessageResponseDto.builder()
+                .id(m.getId())
+                .content(m.getContent())
+                .conversationId(m.getConversationId())
+                .groupId(m.getGroupId())
+                .senderId(m.getSenderId())
+                .senderUsername(senderUsername)
+                .senderDisplayName(senderDisplayName)
+                .type(m.getType())
+                .deliveryStatus(m.getDeliveryStatus())
+                .createdAt(createdAtMs)
+                .mediaFileName(m.getMediaFileName())
+                .mediaMimeType(m.getMediaMimeType())
+                .mediaSizeBytes(m.getMediaSizeBytes())
+                .mediaChecksum(m.getMediaChecksum())
+                .build();
     }
 }

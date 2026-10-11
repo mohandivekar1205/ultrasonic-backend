@@ -1,6 +1,6 @@
 package com.ultrasonic.demo.controller;
 
-import com.ultrasonic.demo.entity.Contact;
+import com.ultrasonic.demo.dto.ContactResponseDto;
 import com.ultrasonic.demo.service.ContactService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -17,13 +17,19 @@ public class ContactController {
     private ContactService contactService;
 
     @PostMapping("/{contactId}")
-    public ResponseEntity<?> addContact(@PathVariable UUID contactId) {
+    public ResponseEntity<Void> addContact(@PathVariable UUID contactId) {
         contactService.addContact(contactId);
-        return ResponseEntity.ok("Contact added");
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping
-    public List<Contact> getContacts() {
-        return contactService.getContacts();
+    public ResponseEntity<List<ContactResponseDto>> getContacts() {
+        return ResponseEntity.ok(contactService.getContacts());
+    }
+
+    @DeleteMapping("/{contactId}")
+    public ResponseEntity<Void> deleteContact(@PathVariable UUID contactId) {
+        contactService.deleteContact(contactId);
+        return ResponseEntity.noContent().build();
     }
 }

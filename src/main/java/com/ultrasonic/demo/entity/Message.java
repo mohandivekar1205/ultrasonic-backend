@@ -2,7 +2,7 @@ package com.ultrasonic.demo.entity;
 
 import jakarta.persistence.*;
 import lombok.Data;
-import org.hibernate.annotations.GenericGenerator;
+import org.springframework.data.domain.Persistable;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -10,7 +10,7 @@ import java.util.UUID;
 @Data
 @Entity
 @Table(name = "messages")
-public class Message implements org.springframework.data.domain.Persistable<UUID> {
+public class Message implements Persistable<UUID> {
     @Id
     private UUID id;
 
@@ -22,20 +22,26 @@ public class Message implements org.springframework.data.domain.Persistable<UUID
         return isNew;
     }
 
-    @PrePersist
-    @PostLoad
-    void markNotNew() {
-        this.isNew = false;
-    }
-
-    @Column(name = "conversation_id", nullable = true)
+    @Column(name = "conversation_id")
     private UUID conversationId;
 
-    @Column(name = "group_id", nullable = true)
+    @Column(name = "group_id")
     private UUID groupId;
 
     @Column(name = "sender_id", nullable = false)
     private UUID senderId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "conversation_id", insertable = false, updatable = false)
+    private Conversation conversation;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_id", insertable = false, updatable = false)
+    private Group group;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sender_id", insertable = false, updatable = false)
+    private User sender;
 
     @Column(nullable = false, length = 20)
     private String type = "text";
@@ -46,10 +52,10 @@ public class Message implements org.springframework.data.domain.Persistable<UUID
     @Column(name = "delivery_status", length = 20)
     private String deliveryStatus = "pending";
 
-    @Column(name = "created_at")
+    @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    @Column(name = "media_file_name")
+    @Column(name = "media_file_name", length = 255)
     private String mediaFileName;
 
     @Column(name = "media_mime_type", length = 100)
@@ -60,4 +66,27 @@ public class Message implements org.springframework.data.domain.Persistable<UUID
 
     @Column(name = "media_checksum", length = 64)
     private String mediaChecksum;
+
+    @PrePersist
+    void prePersist() {
+        this.isNew = false;
+        validateTarget();
+    }
+
+    @PreUpdate
+    void preUpdate() {
+        validateTarget();
+    }
+
+    @PostLoad
+    void markNotNew() {
+        this.isNew = false;
+    }
+
+    private void validateTarget() {
+        boolean valid = (conversationId != null && groupId == null) || (conversationId == null && groupId != null);
+        if (!valid) {
+            throw new IllegalStateException("Violation of chk_msg_target: Message must belong to either a conversation OR a group.");
+        }
+    }
 }

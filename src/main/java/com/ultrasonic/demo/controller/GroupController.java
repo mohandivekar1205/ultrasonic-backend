@@ -1,8 +1,10 @@
 package com.ultrasonic.demo.controller;
 
+import com.ultrasonic.demo.dto.CreateMessageRequest;
+import com.ultrasonic.demo.dto.GroupMemberResponseDto;
+import com.ultrasonic.demo.dto.MessageResponseDto;
 import com.ultrasonic.demo.entity.Group;
 import com.ultrasonic.demo.entity.GroupMember;
-import com.ultrasonic.demo.entity.Message;
 import com.ultrasonic.demo.service.GroupService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -29,12 +31,12 @@ public class GroupController {
     }
 
     @GetMapping("/{id}/members")
-    public ResponseEntity<List<GroupMember>> getMembers(@PathVariable UUID id) {
+    public ResponseEntity<List<GroupMemberResponseDto>> getMembers(@PathVariable UUID id) {
         return ResponseEntity.ok(groupService.getMembers(id));
     }
 
     @GetMapping("/{id}/messages")
-    public ResponseEntity<List<Message>> getGroupMessages(
+    public ResponseEntity<List<MessageResponseDto>> getGroupMessages(
             @PathVariable UUID id,
             @RequestParam(required = false) Long before,
             @RequestParam(defaultValue = "50") int limit) {
@@ -42,9 +44,9 @@ public class GroupController {
     }
 
     @PostMapping("/{id}/messages")
-    public ResponseEntity<Message> createGroupMessage(
+    public ResponseEntity<MessageResponseDto> createGroupMessage(
             @PathVariable UUID id,
-            @RequestBody com.ultrasonic.demo.dto.CreateMessageRequest request) {
+            @RequestBody CreateMessageRequest request) {
         return ResponseEntity.ok(groupService.createMessage(id, request));
     }
 }
@@ -52,7 +54,6 @@ public class GroupController {
 class CreateGroupRequest {
     private String name;
     private List<UUID> memberIds;
-    // Getters and Setters
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     public List<UUID> getMemberIds() { return memberIds; }

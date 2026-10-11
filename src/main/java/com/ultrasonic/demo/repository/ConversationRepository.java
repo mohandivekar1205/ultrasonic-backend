@@ -11,6 +11,8 @@ import java.util.UUID;
 
 public interface ConversationRepository extends JpaRepository<Conversation, UUID> {
     
+    Optional<Conversation> findByUserAIdAndUserBId(UUID userAId, UUID userBId);
+
     @Query("SELECT c FROM Conversation c WHERE (c.userAId = :userId1 AND c.userBId = :userId2) OR (c.userAId = :userId2 AND c.userBId = :userId1)")
     Optional<Conversation> findByUsers(@Param("userId1") UUID userId1, @Param("userId2") UUID userId2);
 

@@ -13,13 +13,21 @@ import java.util.UUID;
 public class GroupMember {
 
     @Id
-    @Column(name = "group_id")
+    @Column(name = "group_id", nullable = false)
     private UUID groupId;
 
     @Id
-    @Column(name = "user_id")
+    @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    @Column(name = "joined_at")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_id", insertable = false, updatable = false)
+    private Group group;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", insertable = false, updatable = false)
+    private User user;
+
+    @Column(name = "joined_at", updatable = false)
     private LocalDateTime joinedAt = LocalDateTime.now();
 }
