@@ -68,16 +68,25 @@ public class SignalingWebSocketHandler extends TextWebSocketHandler {
             }
             SESSION_ROOM_MAP.remove(session.getId());
         } else {
-            // Forward OFFER, ANSWER, ICE_CANDIDATE to target peer
+            // Forward OFFER, ANSWER, ICE_CANDIDATE to target peer, or broadcast CHAT_MESSAGE to room
             msg.setSenderId(session.getId());
             String outPayload = objectMapper.writeValueAsString(msg);
             
             Set<WebSocketSession> roomSessions = ROOMS.get(roomId);
             if (roomSessions != null) {
-                for (WebSocketSession peer : roomSessions) {
-                    if (peer.isOpen() && peer.getId().equals(msg.getTargetId())) {
-                        peer.sendMessage(new TextMessage(outPayload));
-                        break;
+                if (msg.getTargetId() != null && !"CHAT_MESSAGE".equals(msg.getType()) && !"FILE_CHUNK".equals(msg.getType())) {
+                    for (WebSocketSession peer : roomSessions) {
+                        if (peer.isOpen() && peer.getId().equals(msg.getTargetId())) {
+                            peer.sendMessage(new TextMessage(outPayload));
+                            break;
+                        }
+                    }
+                } else {
+                    // Broadcast to all other peers in the room
+                    for (WebSocketSession peer : roomSessions) {
+                        if (peer.isOpen() && !peer.getId().equals(session.getId())) {
+                            peer.sendMessage(new TextMessage(outPayload));
+                        }
                     }
                 }
             }

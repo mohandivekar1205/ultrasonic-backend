@@ -19,17 +19,25 @@ public class JwtTokenProvider {
     private int jwtExpirationMs;
 
     public String generateToken(String username, UUID id) {
+        return generateToken(username, id, null);
+    }
+
+    public String generateToken(String username, UUID id, String displayName) {
         Key key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
 
-        return Jwts.builder()
+        JwtBuilder builder = Jwts.builder()
                 .setSubject(username)
                 .claim("id", id.toString())
                 .setIssuedAt(now)
-                .setExpiration(expiryDate)
-                .signWith(key, SignatureAlgorithm.HS256)
-                .compact();
+                .setExpiration(expiryDate);
+
+        if (displayName != null) {
+            builder.claim("displayName", displayName);
+        }
+
+        return builder.signWith(key, SignatureAlgorithm.HS256).compact();
     }
 
     public String getUsernameFromJWT(String token) {

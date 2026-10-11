@@ -44,6 +44,6 @@ public class AuthService {
         );
 
         User user = userRepository.findByUsername(request.getUsername()).orElseThrow();
-        return tokenProvider.generateToken(user.getUsername(), user.getId());
+        return tokenProvider.generateToken(user.getUsername(), user.getId(), user.getDisplayName());
     }
 }
