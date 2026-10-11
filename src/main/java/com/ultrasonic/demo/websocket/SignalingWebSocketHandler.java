@@ -74,7 +74,7 @@ public class SignalingWebSocketHandler extends TextWebSocketHandler {
             
             Set<WebSocketSession> roomSessions = ROOMS.get(roomId);
             if (roomSessions != null) {
-                if (msg.getTargetId() != null && !"CHAT_MESSAGE".equals(msg.getType()) && !"FILE_CHUNK".equals(msg.getType())) {
+                if (msg.getTargetId() != null && !"CHAT_MESSAGE".equals(msg.getType()) && !"FILE_CHUNK".equals(msg.getType()) && !"REQUEST_FILE".equals(msg.getType())) {
                     for (WebSocketSession peer : roomSessions) {
                         if (peer.isOpen() && peer.getId().equals(msg.getTargetId())) {
                             peer.sendMessage(new TextMessage(outPayload));
