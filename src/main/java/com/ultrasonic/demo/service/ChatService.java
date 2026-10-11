@@ -106,15 +106,19 @@ public class ChatService {
                 dto.setAvatarLetter("U");
             }
 
-            List<Message> msgs = messageRepository.findByConversationIdAndCreatedAtBefore(
-                    c.getId(), LocalDateTime.now().plusDays(1), PageRequest.of(0, 1));
-            if (!msgs.isEmpty()) {
-                Message last = msgs.get(0);
+            Message last = messageRepository.findFirstByConversationIdOrderByCreatedAtDesc(c.getId()).orElse(null);
+            if (last != null) {
                 dto.setLastMessage(last.getContent());
-                dto.setLastMessageTime(last.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+                long time = last.getCreatedAt() != null 
+                    ? last.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    : System.currentTimeMillis();
+                dto.setLastMessageTime(time);
             } else {
                 dto.setLastMessage("No messages yet");
-                dto.setLastMessageTime(c.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+                long time = c.getCreatedAt() != null 
+                    ? c.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    : 0L;
+                dto.setLastMessageTime(time);
             }
             allSummaries.add(dto);
         }
@@ -131,24 +135,29 @@ public class ChatService {
                 dto.setOtherDisplayName(g.getName());
                 dto.setAvatarLetter(g.getName().substring(0, 1).toUpperCase());
 
-                List<Message> msgs = messageRepository.findByGroupIdAndCreatedAtBefore(
-                        g.getId(), LocalDateTime.now().plusDays(1), PageRequest.of(0, 1));
-                if (!msgs.isEmpty()) {
-                    Message last = msgs.get(0);
+                Message last = messageRepository.findFirstByGroupIdOrderByCreatedAtDesc(g.getId()).orElse(null);
+                if (last != null) {
                     dto.setLastMessage(last.getContent());
-                    dto.setLastMessageTime(last.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+                    long time = last.getCreatedAt() != null 
+                        ? last.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                        : System.currentTimeMillis();
+                    dto.setLastMessageTime(time);
                 } else {
                     dto.setLastMessage("Group created");
                     long createdTime = g.getCreatedAt() != null 
                             ? g.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() 
-                            : System.currentTimeMillis();
+                            : 0L;
                     dto.setLastMessageTime(createdTime);
                 }
                 allSummaries.add(dto);
             }
         }
 
-        allSummaries.sort((a, b) -> b.getLastMessageTime().compareTo(a.getLastMessageTime()));
+        allSummaries.sort((a, b) -> {
+            long t1 = a.getLastMessageTime() != null ? a.getLastMessageTime() : 0L;
+            long t2 = b.getLastMessageTime() != null ? b.getLastMessageTime() : 0L;
+            return Long.compare(t2, t1);
+        });
         return allSummaries;
     }
 
