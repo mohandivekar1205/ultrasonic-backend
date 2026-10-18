@@ -38,10 +38,13 @@ public class SignalingWebSocketHandler extends TextWebSocketHandler {
         if ("JOIN".equals(msg.getType())) {
             Set<WebSocketSession> roomSessions = ROOMS.computeIfAbsent(roomId, k -> new CopyOnWriteArraySet<>());
             
+            // Clean up any stale closed sessions
+            roomSessions.removeIf(p -> !p.isOpen());
+
             // Send existing peers to the new peer
             java.util.List<String> existingPeers = new java.util.ArrayList<>();
             for (WebSocketSession peer : roomSessions) {
-                if (peer.isOpen()) {
+                if (peer.isOpen() && !peer.getId().equals(session.getId())) {
                     existingPeers.add(peer.getId());
                     // Notify existing peer that a new peer joined
                     String joinMsg = "{\"type\":\"PEER_JOINED\",\"roomId\":\"" + roomId + "\",\"senderId\":\"" + session.getId() + "\"}";
