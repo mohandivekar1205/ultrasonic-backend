@@ -208,10 +208,10 @@ public class ChatService {
 
     @Transactional
     public void updateMessageStatus(UUID messageId, String status) {
-        Message message = messageRepository.findById(messageId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Message not found"));
-        message.setDeliveryStatus(status);
-        messageRepository.save(message);
+        messageRepository.findById(messageId).ifPresent(message -> {
+            message.setDeliveryStatus(status);
+            messageRepository.save(message);
+        });
     }
 
     public MessageResponseDto mapToResponseDto(Message m) {
