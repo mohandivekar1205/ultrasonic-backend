@@ -49,6 +49,12 @@ public class GroupController {
             @RequestBody CreateMessageRequest request) {
         return ResponseEntity.ok(groupService.createMessage(id, request));
     }
+
+    @PostMapping("/{id}/read")
+    public ResponseEntity<Void> markGroupAsRead(@PathVariable UUID id) {
+        groupService.markGroupAsRead(id);
+        return ResponseEntity.ok().build();
+    }
 }
 
 class CreateGroupRequest {

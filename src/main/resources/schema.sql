@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS public.group_members (
     group_id UUID NOT NULL,
     user_id UUID NOT NULL,
     joined_at TIMESTAMP(6) DEFAULT now(),
+    last_read_at TIMESTAMP(6),
     PRIMARY KEY (group_id, user_id),
     CONSTRAINT fk_gm_group
         FOREIGN KEY (group_id) REFERENCES public.groups(id) ON DELETE CASCADE,

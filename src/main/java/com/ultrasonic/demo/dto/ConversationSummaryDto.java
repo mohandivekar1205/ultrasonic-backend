@@ -12,4 +12,6 @@ public class ConversationSummaryDto {
     private Long lastMessageTime;
     private String avatarLetter;
     private boolean isGroup;
+    private long unreadCount;
+    private boolean unread;
 }

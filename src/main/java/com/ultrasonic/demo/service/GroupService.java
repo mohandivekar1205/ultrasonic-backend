@@ -5,6 +5,7 @@ import com.ultrasonic.demo.dto.GroupMemberResponseDto;
 import com.ultrasonic.demo.dto.MessageResponseDto;
 import com.ultrasonic.demo.entity.Group;
 import com.ultrasonic.demo.entity.GroupMember;
+import com.ultrasonic.demo.entity.GroupMemberId;
 import com.ultrasonic.demo.entity.Message;
 import com.ultrasonic.demo.entity.User;
 import com.ultrasonic.demo.repository.GroupMemberRepository;
@@ -77,7 +78,17 @@ public class GroupService {
         GroupMember gm = new GroupMember();
         gm.setGroupId(groupId);
         gm.setUserId(userId);
+        gm.setLastReadAt(LocalDateTime.now());
         return groupMemberRepository.save(gm);
+    }
+
+    @Transactional
+    public void markGroupAsRead(UUID groupId) {
+        User currentUser = getCurrentUser();
+        GroupMember gm = groupMemberRepository.findById(new GroupMemberId(groupId, currentUser.getId()))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a member of this group"));
+        gm.setLastReadAt(LocalDateTime.now());
+        groupMemberRepository.save(gm);
     }
 
     public List<GroupMemberResponseDto> getMembers(UUID groupId) {

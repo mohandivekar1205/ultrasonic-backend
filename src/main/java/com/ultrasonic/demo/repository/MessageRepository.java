@@ -3,6 +3,7 @@ package com.ultrasonic.demo.repository;
 import com.ultrasonic.demo.entity.Message;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -33,4 +34,14 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
             @Param("groupId") UUID groupId, 
             @Param("timestamp") LocalDateTime timestamp, 
             Pageable pageable);
+
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.conversationId = :conversationId AND m.senderId <> :userId AND (m.deliveryStatus IS NULL OR m.deliveryStatus <> 'read')")
+    long countUnreadConversationMessages(@Param("conversationId") UUID conversationId, @Param("userId") UUID userId);
+
+    @Modifying
+    @Query("UPDATE Message m SET m.deliveryStatus = 'read' WHERE m.conversationId = :conversationId AND m.senderId <> :userId AND (m.deliveryStatus IS NULL OR m.deliveryStatus <> 'read')")
+    int markConversationAsRead(@Param("conversationId") UUID conversationId, @Param("userId") UUID userId);
+
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.groupId = :groupId AND m.senderId <> :userId AND m.createdAt > :since")
+    long countUnreadGroupMessages(@Param("groupId") UUID groupId, @Param("userId") UUID userId, @Param("since") LocalDateTime since);
 }

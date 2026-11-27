@@ -56,4 +56,10 @@ public class ConversationController {
         MessageResponseDto message = chatService.createMessage(id, request);
         return ResponseEntity.ok(message);
     }
+
+    @PostMapping("/{id}/read")
+    public ResponseEntity<Void> markConversationAsRead(@PathVariable UUID id) {
+        chatService.markConversationAsRead(id);
+        return ResponseEntity.ok().build();
+    }
 }

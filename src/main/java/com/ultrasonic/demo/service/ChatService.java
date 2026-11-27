@@ -120,6 +120,9 @@ public class ChatService {
                     : 0L;
                 dto.setLastMessageTime(time);
             }
+            long unreadCount = messageRepository.countUnreadConversationMessages(c.getId(), currentUser.getId());
+            dto.setUnreadCount(unreadCount);
+            dto.setUnread(unreadCount > 0);
             allSummaries.add(dto);
         }
 
@@ -149,6 +152,12 @@ public class ChatService {
                             : 0L;
                     dto.setLastMessageTime(createdTime);
                 }
+                LocalDateTime lastRead = gm.getLastReadAt() != null
+                        ? gm.getLastReadAt()
+                        : (gm.getJoinedAt() != null ? gm.getJoinedAt() : LocalDateTime.of(1970, 1, 1, 0, 0));
+                long unreadCount = messageRepository.countUnreadGroupMessages(g.getId(), currentUser.getId(), lastRead);
+                dto.setUnreadCount(unreadCount);
+                dto.setUnread(unreadCount > 0);
                 allSummaries.add(dto);
             }
         }
@@ -212,6 +221,17 @@ public class ChatService {
             message.setDeliveryStatus(status);
             messageRepository.save(message);
         });
+    }
+
+    @Transactional
+    public void markConversationAsRead(UUID conversationId) {
+        User currentUser = getCurrentUser();
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found"));
+        if (!conversation.getUserAId().equals(currentUser.getId()) && !conversation.getUserBId().equals(currentUser.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not a participant of this conversation");
+        }
+        messageRepository.markConversationAsRead(conversationId, currentUser.getId());
     }
 
     public MessageResponseDto mapToResponseDto(Message m) {
